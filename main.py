@@ -13,15 +13,16 @@ load_dotenv()
 
 # --- CONFIGURATION ---
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-ALLOWED_GUILD_ID = int(os.getenv("ALLOWED_GUILD_ID", 0))
+ALLOWED_GUILD_ID = int(os.getenv("ALLOWED_GUILD_ID", 0) or 0)
 PORT = int(os.getenv("PORT", 10000))
 DATABASE_PATH = os.getenv("DATABASE_PATH", "vorstyafk.db").replace("sqlite:///", "")
 ACCOUNT_AGE_DAYS = int(os.getenv("ACCOUNT_AGE_DAYS", 7))
-ALERT_CHANNEL_ID = int(os.getenv("ALERT_CHANNEL_ID", 0))
+ALERT_CHANNEL_ID = int(os.getenv("ALERT_CHANNEL_ID", 0) or 0)
 MAX_SLOTS = int(os.getenv("MAX_SLOTS", 50))
 
 if not DISCORD_TOKEN or not ALLOWED_GUILD_ID:
-    raise ValueError("❌ CRITICAL ERROR: DISCORD_TOKEN or ALLOWED_GUILD_ID is missing in environment variables!")
+    print("❌ CRITICAL ERROR: DISCORD_TOKEN or ALLOWED_GUILD_ID is missing in Render Environment Variables!")
+    exit(1)
 
 # --- FLASK HEALTH CHECK FOR RENDER ---
 app = Flask(__name__)
@@ -82,15 +83,15 @@ PLANS_DATA = {
 @bot.event
 async def on_ready():
     await init_db()
-    print(f"Logged in as {bot.user} (ID: {bot.user.id})")
+    print(f"✅ Logged in successfully as {bot.user} (ID: {bot.user.id})")
     
     guild = discord.Object(id=ALLOWED_GUILD_ID)
     try:
         bot.tree.copy_global_to(guild=guild)
         await bot.tree.sync(guild=guild)
-        print("Slash commands synced successfully to allowed guild.")
+        print("✅ Slash commands synced successfully to allowed guild.")
     except Exception as e:
-        print(f"Failed to sync slash commands: {e}")
+        print(f"❌ Failed to sync slash commands: {e}")
     
     if not check_expirations.is_running():
         check_expirations.start()
@@ -98,7 +99,7 @@ async def on_ready():
 @bot.event
 async def on_guild_join(guild):
     if guild.id != ALLOWED_GUILD_ID:
-        print(f"Unauthorized guild {guild.name} ({guild.id}). Leaving immediately...")
+        print(f"⚠️ Unauthorized guild {guild.name} ({guild.id}). Leaving immediately...")
         await guild.leave()
 
 # --- BACKGROUND EXPIRY TASK ---
