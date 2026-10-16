@@ -35,8 +35,7 @@ def run_flask():
 
 # --- DATABASE SETUP ---
 async def init_db():
-    asyncign = aiosqlite.connect(DATABASE_PATH)
-    async with asyncign as db:
+    async with aiosqlite.connect(DATABASE_PATH) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS members (
                 user_id INTEGER PRIMARY KEY,
@@ -68,14 +67,14 @@ bot = commands.Bot(command_prefix="$", intents=intents, help_command=None)
 
 # --- PLANS & AFK BOTS POOL DATA ---
 PLANS_DATA = {
-    2: {"days": 3, name: "3 Days Plan"},
-    4: {"days": 7, name: "7 Days Plan"},
-    6: {"days": 15, name: "15 Days Plan"},
-    8: {"days": 22, name: "22 Days Plan"},
-    12: {"days": 30, name: "30 Days Plan"},
-    16: {"days": 60, name: "60 Days Plan"},
-    24: {"days": 90, name: "90 Days Plan"},
-    60: {"days": 9999, name: "Lifetime Plan"}
+    2: {"days": 3, "name": "3 Days Plan"},
+    4: {"days": 7, "name": "7 Days Plan"},
+    6: {"days": 15, "name": "15 Days Plan"},
+    8: {"days": 22, "name": "22 Days Plan"},
+    12: {"days": 30, "name": "30 Days Plan"},
+    16: {"days": 60, "name": "60 Days Plan"},
+    24: {"days": 90, "name": "90 Days Plan"},
+    60: {"days": 9999, "name": "Lifetime Plan"}
 }
 
 # 50 AFK Bots mapped with their GitHub Repository names
@@ -86,14 +85,14 @@ AFK_BOTS_POOL = [
 @bot.event
 async def on_ready():
     await init_db()
-    print(f"✅ Logged in successfully as {bot.user} (ID: {bot.user.id})[span_7](start_span)[span_7](end_span)")
+    print(f"✅ Logged in successfully as {bot.user} (ID: {bot.user.id})")
     
     guild = discord.Object(id=ALLOWED_GUILD_ID)
     try:
         bot.tree.clear_commands(guild=guild)
         bot.tree.copy_global_to(guild=guild)
         await bot.tree.sync(guild=guild)
-        print("✅ Slash commands synced successfully to allowed guild[span_8](start_span)[span_8](end_span).")
+        print("✅ Slash commands synced successfully to allowed guild.")
     except Exception as e:
         print(f"❌ Failed to sync slash commands: {e}")
     
@@ -103,7 +102,7 @@ async def on_ready():
 @bot.event
 async def on_guild_join(guild):
     if guild.id != ALLOWED_GUILD_ID:
-        print(f"⚠️ Unauthorized guild {guild.name} ({guild.id}). Leaving immediately...[span_9](start_span)[span_9](end_span)")
+        print(f"⚠️ Unauthorized guild {guild.name} ({guild.id}). Leaving immediately...")
         await guild.leave()
 
 # --- BACKGROUND EXPIRY TASK ---
@@ -118,7 +117,6 @@ async def check_expirations():
             expired_plans = await cursor.fetchall()
 
         for user_id, plan_name, assigned_bot, ip, port in expired_plans:
-            # Delete expired plan so slot is freed and user can claim again
             await db.execute("DELETE FROM user_plans WHERE user_id = ?", (user_id,))
             await db.commit()
 
@@ -153,7 +151,7 @@ async def prefix_help(ctx):
     embed.add_field(name="💎 Claim Plan", value="`$claim <invites> <ip> <port>`\n*(Example: `$claim 4 Hypixel.net 25565`)*", inline=False)
     embed.add_field(name="📊 Check Invites", value="`$i` (or `$i @member`)", inline=False)
     embed.add_field(name="👑 Admin Commands", value="`$set @member <invites>`", inline=False)
-    embed.set_footer(text="VorstyAFK System • Secure 24/7 Hosting[span_10](start_span)[span_10](end_span)")
+    embed.set_footer(text="VorstyAFK System • Secure 24/7 Hosting")
     await ctx.send(embed=embed)
 
 @bot.tree.command(name="help", description="Show help menu for VorstyAFK")
@@ -178,7 +176,6 @@ async def prefix_invites(ctx, member: discord.Member = None):
 
     if plan_row:
         plan_name, expires_at = plan_row
-        # Calculate remaining days
         exp_dt = datetime.strptime(expires_at, "%Y-%m-%d %H:%M:%S")
         remaining_days = max(1, (exp_dt - datetime.utcnow()).days)
         expire_display = f"{expires_at} UTC"
@@ -197,7 +194,6 @@ async def prefix_invites(ctx, member: discord.Member = None):
 
 @bot.command(name="claim")
 async def prefix_claim(ctx, invites: int, ip: str, port: int):
-    # Check if invites count matches a valid plan tier
     if invites not in PLANS_DATA:
         valid_tiers = ", ".join([str(k) for k in PLANS_DATA.keys()])
         await ctx.send(f"❌ Invalid invite requirement! Valid invite amounts for plans are: `{valid_tiers}`. Check `$help`.")
@@ -208,14 +204,12 @@ async def prefix_claim(ctx, invites: int, ip: str, port: int):
     days = plan_info["days"]
 
     async with aiosqlite.connect(DATABASE_PATH) as db:
-        # 1. Check if user already has an active plan
         async with db.execute("SELECT expires_at FROM user_plans WHERE user_id = ?", (ctx.author.id,)) as cursor:
             existing_plan = await cursor.fetchone()
         if existing_plan:
             await ctx.send(f"❌ You already have an active plan running until `{existing_plan[0]} UTC`. You cannot claim another until it expires.")
             return
 
-        # 2. Check total active slots (Max 50)
         async with db.execute("SELECT COUNT(*) FROM user_plans") as cursor:
             slot_row = await cursor.fetchone()
             active_slots = slot_row[0] if slot_row else 0
@@ -224,7 +218,6 @@ async def prefix_claim(ctx, invites: int, ip: str, port: int):
             await ctx.send(f"❌ **Slots Full ({active_slots}/{MAX_SLOTS})!** All 50 AFK bot hosting slots are currently occupied.")
             return
 
-        # 3. Check user available invites
         async with db.execute("SELECT earned_credits - spent_credits FROM members WHERE user_id = ?", (ctx.author.id,)) as cursor:
             row = await cursor.fetchone()
             available = row[0] if row else 0
@@ -233,7 +226,6 @@ async def prefix_claim(ctx, invites: int, ip: str, port: int):
             await ctx.send(f"❌ Insufficient invites! You need **{invites}** invites for the **{plan_name}**, but you only have **{available}** available.")
             return
 
-        # 4. Find an unassigned bot from the 50 bots pool
         async with db.execute("SELECT assigned_bot FROM user_plans") as cursor:
             assigned_rows = await cursor.fetchall()
         taken_bots = {row[0] for row in assigned_rows}
@@ -243,12 +235,9 @@ async def prefix_claim(ctx, invites: int, ip: str, port: int):
             await ctx.send("❌ Error: All server bot instances are currently deployed!")
             return
 
-        assigned_bot = available_bots[0] # Pick the first free bot
-
-        # 5. Calculate expiry
+        assigned_bot = available_bots[0]
         expires_at = (datetime.utcnow() + timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
 
-        # 6. Update database (Deduct invites, save active plan)
         await db.execute("UPDATE members SET spent_credits = spent_credits + ? WHERE user_id = ?", (invites, ctx.author.id))
         await db.execute("""
             INSERT INTO user_plans (user_id, plan_name, status, ip_address, port, assigned_bot, expires_at)
@@ -256,10 +245,8 @@ async def prefix_claim(ctx, invites: int, ip: str, port: int):
         """, (ctx.author.id, plan_name, ip, port, assigned_bot, expires_at))
         await db.commit()
 
-    # Success reply to user
     await ctx.send(f"✅ **Plan Successfully Claimed!**\n📦 **Plan:** {plan_name}\n🤖 **Assigned Bot:** `{assigned_bot}`\n🌐 **Target IP/Port:** `{ip}:{port}`\n⏳ **Expires At:** `{expires_at} UTC`")
 
-    # Alert Channel Embed Notification
     if ALERT_CHANNEL_ID:
         alert_channel = bot.get_channel(ALERT_CHANNEL_ID)
         if alert_channel:
@@ -282,7 +269,7 @@ async def prefix_set_invites(ctx, member: discord.Member, amount: int):
             ON CONFLICT(user_id) DO UPDATE SET earned_credits = ?
         """, (member.id, amount, amount))
         await db.commit()
-    await ctx.send(f"✅ Successfully set earned invites for {member.mention} to **{amount}**[span_11](start_span)[span_11](end_span).")
+    await ctx.send(f"✅ Successfully set earned invites for {member.mention} to **{amount}**.")
 
 @prefix_set_invites.error
 async def set_invites_error(ctx, error):
