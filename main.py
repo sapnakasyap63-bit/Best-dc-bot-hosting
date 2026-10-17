@@ -10,7 +10,6 @@ import aiosqlite
 
 load_dotenv()
 
-# --- CONFIGURATION ---
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 ALLOWED_GUILD_ID = int(os.getenv("ALLOWED_GUILD_ID", 0) or 0)
 PORT = int(os.getenv("PORT", 10000))
@@ -113,7 +112,7 @@ async def check_expirations():
                 if channel:
                     embed = discord.Embed(
                         title="🔴 PLAN EXPIRED - STOP BOT MANUALLY IF NEEDED",
-                        description=f"User <@{user_id}> plan has expired.\nAssigned GitHub Repo: `{assigned_bot}`\nEndpoint was: `{endpoint_str}`\nSlot is now free! Block reconnect.",
+                        description=f"User <@{user_id}> plan has expired.\nAssigned GitHub Repo: `{assigned_bot}`\nEndpoint was: `{endpoint_str}`\nSlot is now free!",
                         color=discord.Color.dark_red()
                     )
                     await channel.send(embed=embed)
@@ -171,7 +170,6 @@ async def prefix_claim(ctx, invites: int, ip: str, port: str = None):
         """, (ctx.author.id, plan_name, ip, port, assigned_bot, expires_at))
         await db.commit()
 
-    # Dynamic endpoint format without forcing default port
     endpoint_display = f"{ip}:{port}" if port else ip
     await ctx.send(f"✅ **Plan Claimed Successfully!**\n📦 **Plan:** {plan_name}\n🤖 **Assigned GitHub Repo:** `{assigned_bot}`\n🌐 **Target IP/Endpoint:** `{endpoint_display}`\n⏳ **Expires At:** `{expires_at} UTC`")
 
@@ -185,6 +183,34 @@ async def prefix_claim(ctx, invites: int, ip: str, port: str = None):
             embed.add_field(name="Assigned GitHub Repo", value=f"`{assigned_bot}`", inline=False)
             embed.add_field(name="Target Server", value=f"`{endpoint_display}`", inline=False)
             embed.add_field(name="Expiry Time", value=f"{expires_at} UTC", inline=False)
+            await alert_channel.send(embed=embed)
+
+# 🛑 NEW ADMIN COMMAND: Remove Member Plan & Repo
+@bot.command(name="remove")
+@commands.has_permissions(administrator=True)
+async def prefix_remove_plan(ctx, member: discord.Member):
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        async with db.execute("SELECT assigned_bot, ip_address, port FROM user_plans WHERE user_id = ?", (member.id,)) as cursor:
+            row = await cursor.fetchone()
+        
+        if not row:
+            await ctx.send(f"❌ Member {member.mention} has no active plan or repo assigned.")
+            return
+
+        assigned_bot, ip, port = row
+        await db.execute("DELETE FROM user_plans WHERE user_id = ?", (member.id,))
+        await db.commit()
+
+    await ctx.send(f"✅ Successfully removed plan and released assigned repo **`{assigned_bot}`** for {member.mention}.")
+
+    if ALERT_CHANNEL_ID:
+        alert_channel = bot.get_channel(ALERT_CHANNEL_ID)
+        if alert_channel:
+            embed = discord.Embed(
+                title="🗑️ Plan Removed by Admin",
+                description=f"Admin {ctx.author.mention} removed plan for {member.mention}.\nReleased Repo: `{assigned_bot}`",
+                color=discord.Color.red()
+            )
             await alert_channel.send(embed=embed)
 
 @bot.command(name="i")
@@ -254,7 +280,6 @@ async def prefix_upgrade(ctx, *, description: str = None):
         return
 
     upgrade_cost = 2
-
     async with aiosqlite.connect(DATABASE_PATH) as db:
         async with db.execute("SELECT earned_credits - spent_credits FROM members WHERE user_id = ?", (ctx.author.id,)) as cursor:
             row = await cursor.fetchone()
