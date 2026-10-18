@@ -76,7 +76,7 @@ AFK_BOTS_POOL = [f"Vorsty-AFK-Repo-{i}" for i in range(1, 51)]
 @bot.event
 async def on_ready():
     await init_db()
-    print(f"✅ Logged in successfully as {bot.user} (ID: {bot.user.id})")
+    print(f"✅ Central Bot logged in successfully as {bot.user}")
     if not check_expirations.is_running():
         check_expirations.start()
 
@@ -111,7 +111,7 @@ async def check_expirations():
                 channel = bot.get_channel(ALERT_CHANNEL_ID)
                 if channel:
                     embed = discord.Embed(
-                        title="🔴 PLAN EXPIRED - STOP BOT MANUALLY IF NEEDED",
+                        title="🔴 PLAN EXPIRED",
                         description=f"User <@{user_id}> plan has expired.\nAssigned GitHub Repo: `{assigned_bot}`\nEndpoint was: `{endpoint_str}`\nSlot is now free!",
                         color=discord.Color.dark_red()
                     )
@@ -176,7 +176,7 @@ async def prefix_claim(ctx, invites: int, ip: str, port: str = None):
     if ALERT_CHANNEL_ID:
         alert_channel = bot.get_channel(ALERT_CHANNEL_ID)
         if alert_channel:
-            embed = discord.Embed(title="🤖 New AFK Bot Deployed & Claimed", color=discord.Color.from_rgb(87, 242, 135))
+            embed = discord.Embed(title="🤖 New Plan Claimed & Repo Assigned", color=discord.Color.from_rgb(87, 242, 135))
             embed.add_field(name="Member", value=f"{ctx.author.mention} (`{ctx.author}`)", inline=False)
             embed.add_field(name="Claimed Plan", value=plan_name, inline=True)
             embed.add_field(name="Invites Spent", value=str(invites), inline=True)
@@ -185,13 +185,10 @@ async def prefix_claim(ctx, invites: int, ip: str, port: str = None):
             embed.add_field(name="Expiry Time", value=f"{expires_at} UTC", inline=False)
             await alert_channel.send(embed=embed)
 
-# 🛑 UPDATED ADMIN REMOVE COMMAND (Supports Member Mention OR User ID)
 @bot.command(name="remove")
 @commands.has_permissions(administrator=True)
 async def prefix_remove_plan(ctx, user_input: str):
     target_id = None
-    
-    # Check if input is a mention (e.g., <@123456789> or <@!123456789>)
     if user_input.startswith("<@") and user_input.endswith(">"):
         cleaned = user_input.replace("<@", "").replace("!", "").replace(">", "")
         if cleaned.isdigit():
@@ -286,36 +283,6 @@ async def admin_check_repo(ctx, member: discord.Member):
     embed.add_field(name="Target Server", value=f"`{endpoint_display}`", inline=True)
     embed.add_field(name="Expiry Time", value=f"{expires_at} UTC", inline=False)
     await ctx.send(embed=embed)
-
-@bot.command(name="upgrade")
-async def prefix_upgrade(ctx, *, description: str = None):
-    if not description:
-        await ctx.send("❌ Please provide upgrade details!")
-        return
-
-    upgrade_cost = 2
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        async with db.execute("SELECT earned_credits - spent_credits FROM members WHERE user_id = ?", (ctx.author.id,)) as cursor:
-            row = await cursor.fetchone()
-            available = row[0] if row else 0
-
-        if available < upgrade_cost:
-            await ctx.send(f"❌ Insufficient invites for upgrade! Need {upgrade_cost} invites.")
-            return
-
-        await db.execute("UPDATE members SET spent_credits = spent_credits + ? WHERE user_id = ?", (upgrade_cost, ctx.author.id))
-        await db.commit()
-
-    await ctx.send(f"✅ **Upgrade Request Submitted!** 2 invites deducted.")
-
-    if ALERT_CHANNEL_ID:
-        alert_channel = bot.get_channel(ALERT_CHANNEL_ID)
-        if alert_channel:
-            embed = discord.Embed(title="🚀 New Plan Upgrade Request", color=discord.Color.orange())
-            embed.add_field(name="Member", value=f"{ctx.author.mention} (`{ctx.author}`)", inline=False)
-            embed.add_field(name="Upgrade Details", value=description, inline=False)
-            embed.add_field(name="Invites Deducted", value=str(upgrade_cost), inline=True)
-            await alert_channel.send(embed=embed)
 
 @bot.command(name="set")
 @commands.has_permissions(administrator=True)
