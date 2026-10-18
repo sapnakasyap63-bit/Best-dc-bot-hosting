@@ -164,7 +164,7 @@ async def prefix_claim(ctx, invites: int, ip: str, port: str = None):
     if ALERT_CHANNEL_ID:
         alert_channel = bot.get_channel(ALERT_CHANNEL_ID)
         if alert_channel:
-            embed = discord.Embed(title="🤖 New AFK Bot Deployed & Claimed", color=discord.Color.from_rgb(87, 242, 135))
+            embed = discord.Embed(title="🤖 New Plan Claimed & Repo Assigned", color=discord.Color.from_rgb(87, 242, 135))
             embed.add_field(name="Member", value=f"{ctx.author.mention} (`{ctx.author}`)", inline=False)
             embed.add_field(name="Claimed Plan", value=plan_name, inline=True)
             embed.add_field(name="Invites Spent", value=str(invites), inline=True)
