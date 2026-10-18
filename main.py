@@ -100,7 +100,7 @@ async def check_expirations():
                 if channel:
                     embed = discord.Embed(
                         title="🔴 PLAN EXPIRED",
-                        description=f"User <@{user_id}> plan has expired.\nAssigned GitHub Repo: `{assigned_bot}`\nEndpoint was: `{endpoint_str}`\nSlot is now free!",
+                        description=f"User <@{user_id}> plan has expired.\nAssigned Repo: `{assigned_bot}`\nEndpoint was: `{endpoint_str}`\nSlot is now free!",
                         color=discord.Color.dark_red()
                     )
                     await channel.send(embed=embed)
@@ -159,48 +159,26 @@ async def prefix_claim(ctx, invites: int, ip: str, port: str = None):
         await db.commit()
 
     endpoint_display = f"{ip}:{port}" if port else ip
-    await ctx.send(f"✅ **Plan Claimed Successfully!**\n📦 **Plan:** {plan_name}\n🤖 **Assigned GitHub Repo:** `{assigned_bot}`\n🌐 **Target IP/Endpoint:** `{endpoint_display}`\n⏳ **Expires At:** `{expires_at} UTC`")
-
-    if ALERT_CHANNEL_ID:
-        alert_channel = bot.get_channel(ALERT_CHANNEL_ID)
-        if alert_channel:
-            embed = discord.Embed(title="🤖 New Plan Claimed & Repo Assigned", color=discord.Color.from_rgb(87, 242, 135))
-            embed.add_field(name="Member", value=f"{ctx.author.mention} (`{ctx.author}`)", inline=False)
-            embed.add_field(name="Claimed Plan", value=plan_name, inline=True)
-            embed.add_field(name="Invites Spent", value=str(invites), inline=True)
-            embed.add_field(name="Assigned GitHub Repo", value=f"`{assigned_bot}`", inline=False)
-            embed.add_field(name="Server Endpoint", value=f"`{endpoint_display}`", inline=False)
-            embed.add_field(name="Expiry Time", value=f"{expires_at} UTC", inline=False)
-            await alert_channel.send(embed=embed)
+    await ctx.send(f"✅ **Plan Claimed Successfully!**\n📦 **Plan:** {plan_name}\n🤖 **Assigned Repo:** `{assigned_bot}`\n🌐 **Target IP:** `{endpoint_display}`\n⏳ **Expires At:** `{expires_at} UTC`")
 
 @bot.command(name="remove")
 @commands.has_permissions(administrator=True)
-async def prefix_remove_plan(ctx, user_input: str):
-    target_id = None
-    if user_input.startswith("<@") and user_input.endswith(">"):
-        cleaned = user_input.replace("<@", "").replace("!", "").replace(">", "")
-        if cleaned.isdigit():
-            target_id = int(cleaned)
-    elif user_input.isdigit():
-        target_id = int(user_input)
-
-    if not target_id:
-        await ctx.send("❌ Please provide a valid Member Mention or User ID! Example: `$remove @User` or `$remove 123456789`")
-        return
+async def prefix_remove_plan(ctx, member: discord.Member):
+    target_id = member.id
 
     async with aiosqlite.connect(DATABASE_PATH) as db:
         async with db.execute("SELECT assigned_bot, ip_address, port FROM user_plans WHERE user_id = ?", (target_id,)) as cursor:
             row = await cursor.fetchone()
         
         if not row:
-            await ctx.send(f"❌ User with ID `{target_id}` has no active plan or repo assigned.")
+            await ctx.send(f"❌ User {member.mention} has no active plan or repo assigned.")
             return
 
         assigned_bot, ip, port = row
         await db.execute("DELETE FROM user_plans WHERE user_id = ?", (target_id,))
         await db.commit()
 
-    await ctx.send(f"✅ Successfully removed plan and released assigned repo **`{assigned_bot}`** for user ID `{target_id}`.")
+    await ctx.send(f"✅ Successfully removed plan and freed slot **`{assigned_bot}`** for user {member.mention}.")
 
 @bot.command(name="i")
 async def prefix_invites(ctx, member: discord.Member = None):
@@ -230,14 +208,11 @@ async def prefix_invites(ctx, member: discord.Member = None):
         repo_display = "None"
         endpoint_display = "None"
 
-    embed = discord.Embed(title=f"📊 Invite & Active Plan Status: {target.name}", color=discord.Color.green())
+    embed = discord.Embed(title=f"📊 Status: {target.name}", color=discord.Color.green())
     embed.add_field(name="✅ Current Invites", value=str(current), inline=True)
     embed.add_field(name="💸 Used Invites", value=str(spent), inline=True)
-    embed.add_field(name="🚫 Fake Invites", value=str(fake), inline=True)
-    embed.add_field(name="🤖 Active GitHub Repo", value=repo_display, inline=False)
-    embed.add_field(name="🌐 Target Server", value=endpoint_display, inline=False)
-    embed.add_field(name="⏳ Plan Expire Time", value=expire_display, inline=True)
-    embed.add_field(name="📅 Remaining Days", value=days_display, inline=True)
+    embed.add_field(name="🤖 Active Repo", value=repo_display, inline=False)
+    embed.add_field(name="⏳ Expires At", value=expire_display, inline=True)
     await ctx.send(embed=embed)
 
 @bot.command(name="set")
@@ -249,7 +224,7 @@ async def prefix_set_invites(ctx, member: discord.Member, amount: int):
             ON CONFLICT(user_id) DO UPDATE SET earned_credits = ?
         """, (member.id, amount, amount))
         await db.commit()
-    await ctx.send(f"✅ Successfully set earned invites for {member.mention} to **{amount}**.")
+    await ctx.send(f"✅ Successfully set invites for {member.mention} to **{amount}**.")
 
 if __name__ == "__main__":
     threading.Thread(target=run_flask, daemon=True).start()
