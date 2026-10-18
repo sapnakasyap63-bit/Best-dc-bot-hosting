@@ -95,18 +95,6 @@ async def check_expirations():
             await db.commit()
 
             endpoint_str = f"{ip}:{port}" if port else ip
-            user = bot.get_user(user_id)
-            if user:
-                try:
-                    embed = discord.Embed(
-                        title="⚠️ Hosting Plan Expired",
-                        description=f"Your **{plan_name}** for server `{endpoint_str}` has expired. Assigned repository `{assigned_bot}` has been released.",
-                        color=discord.Color.red()
-                    )
-                    await user.send(embed=embed)
-                except Exception:
-                    pass
-
             if ALERT_CHANNEL_ID:
                 channel = bot.get_channel(ALERT_CHANNEL_ID)
                 if channel:
@@ -176,12 +164,12 @@ async def prefix_claim(ctx, invites: int, ip: str, port: str = None):
     if ALERT_CHANNEL_ID:
         alert_channel = bot.get_channel(ALERT_CHANNEL_ID)
         if alert_channel:
-            embed = discord.Embed(title="🤖 New Plan Claimed & Repo Assigned", color=discord.Color.from_rgb(87, 242, 135))
+            embed = discord.Embed(title="🤖 New AFK Bot Deployed & Claimed", color=discord.Color.from_rgb(87, 242, 135))
             embed.add_field(name="Member", value=f"{ctx.author.mention} (`{ctx.author}`)", inline=False)
             embed.add_field(name="Claimed Plan", value=plan_name, inline=True)
             embed.add_field(name="Invites Spent", value=str(invites), inline=True)
             embed.add_field(name="Assigned GitHub Repo", value=f"`{assigned_bot}`", inline=False)
-            embed.add_field(name="Target Server", value=f"`{endpoint_display}`", inline=False)
+            embed.add_field(name="Server Endpoint", value=f"`{endpoint_display}`", inline=False)
             embed.add_field(name="Expiry Time", value=f"{expires_at} UTC", inline=False)
             await alert_channel.send(embed=embed)
 
@@ -213,16 +201,6 @@ async def prefix_remove_plan(ctx, user_input: str):
         await db.commit()
 
     await ctx.send(f"✅ Successfully removed plan and released assigned repo **`{assigned_bot}`** for user ID `{target_id}`.")
-
-    if ALERT_CHANNEL_ID:
-        alert_channel = bot.get_channel(ALERT_CHANNEL_ID)
-        if alert_channel:
-            embed = discord.Embed(
-                title="🗑️ Plan Removed by Admin",
-                description=f"Admin {ctx.author.mention} removed plan for user ID: `{target_id}`.\nReleased Repo: `{assigned_bot}`",
-                color=discord.Color.red()
-            )
-            await alert_channel.send(embed=embed)
 
 @bot.command(name="i")
 async def prefix_invites(ctx, member: discord.Member = None):
@@ -260,28 +238,6 @@ async def prefix_invites(ctx, member: discord.Member = None):
     embed.add_field(name="🌐 Target Server", value=endpoint_display, inline=False)
     embed.add_field(name="⏳ Plan Expire Time", value=expire_display, inline=True)
     embed.add_field(name="📅 Remaining Days", value=days_display, inline=True)
-    await ctx.send(embed=embed)
-
-@bot.command(name="adminrepo")
-@commands.has_permissions(administrator=True)
-async def admin_check_repo(ctx, member: discord.Member):
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        async with db.execute("SELECT plan_name, assigned_bot, ip_address, port, expires_at FROM user_plans WHERE user_id = ?", (member.id,)) as cursor:
-            plan_row = await cursor.fetchone()
-
-    if not plan_row:
-        await ctx.send(f"❌ Member {member.mention} does not have any active hosting plan or repo assigned.")
-        return
-
-    plan_name, assigned_bot, ip, port, expires_at = plan_row
-    endpoint_display = f"{ip}:{port}" if port else f"{ip}"
-
-    embed = discord.Embed(title=f"👑 Admin Repo Lookup: {member.name}", color=discord.Color.gold())
-    embed.add_field(name="Member", value=member.mention, inline=False)
-    embed.add_field(name="Assigned GitHub Repo", value=f"`{assigned_bot}`", inline=False)
-    embed.add_field(name="Plan Name", value=plan_name, inline=True)
-    embed.add_field(name="Target Server", value=f"`{endpoint_display}`", inline=True)
-    embed.add_field(name="Expiry Time", value=f"{expires_at} UTC", inline=False)
     await ctx.send(embed=embed)
 
 @bot.command(name="set")
