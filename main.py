@@ -185,30 +185,44 @@ async def prefix_claim(ctx, invites: int, ip: str, port: str = None):
             embed.add_field(name="Expiry Time", value=f"{expires_at} UTC", inline=False)
             await alert_channel.send(embed=embed)
 
-# 🛑 NEW ADMIN COMMAND: Remove Member Plan & Repo
+# 🛑 UPDATED ADMIN REMOVE COMMAND (Supports Member Mention OR User ID)
 @bot.command(name="remove")
 @commands.has_permissions(administrator=True)
-async def prefix_remove_plan(ctx, member: discord.Member):
+async def prefix_remove_plan(ctx, user_input: str):
+    target_id = None
+    
+    # Check if input is a mention (e.g., <@123456789> or <@!123456789>)
+    if user_input.startswith("<@") and user_input.endswith(">"):
+        cleaned = user_input.replace("<@", "").replace("!", "").replace(">", "")
+        if cleaned.isdigit():
+            target_id = int(cleaned)
+    elif user_input.isdigit():
+        target_id = int(user_input)
+
+    if not target_id:
+        await ctx.send("❌ Please provide a valid Member Mention or User ID! Example: `$remove @User` or `$remove 123456789`")
+        return
+
     async with aiosqlite.connect(DATABASE_PATH) as db:
-        async with db.execute("SELECT assigned_bot, ip_address, port FROM user_plans WHERE user_id = ?", (member.id,)) as cursor:
+        async with db.execute("SELECT assigned_bot, ip_address, port FROM user_plans WHERE user_id = ?", (target_id,)) as cursor:
             row = await cursor.fetchone()
         
         if not row:
-            await ctx.send(f"❌ Member {member.mention} has no active plan or repo assigned.")
+            await ctx.send(f"❌ User with ID `{target_id}` has no active plan or repo assigned.")
             return
 
         assigned_bot, ip, port = row
-        await db.execute("DELETE FROM user_plans WHERE user_id = ?", (member.id,))
+        await db.execute("DELETE FROM user_plans WHERE user_id = ?", (target_id,))
         await db.commit()
 
-    await ctx.send(f"✅ Successfully removed plan and released assigned repo **`{assigned_bot}`** for {member.mention}.")
+    await ctx.send(f"✅ Successfully removed plan and released assigned repo **`{assigned_bot}`** for user ID `{target_id}`.")
 
     if ALERT_CHANNEL_ID:
         alert_channel = bot.get_channel(ALERT_CHANNEL_ID)
         if alert_channel:
             embed = discord.Embed(
                 title="🗑️ Plan Removed by Admin",
-                description=f"Admin {ctx.author.mention} removed plan for {member.mention}.\nReleased Repo: `{assigned_bot}`",
+                description=f"Admin {ctx.author.mention} removed plan for user ID: `{target_id}`.\nReleased Repo: `{assigned_bot}`",
                 color=discord.Color.red()
             )
             await alert_channel.send(embed=embed)
